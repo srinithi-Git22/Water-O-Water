@@ -1,0 +1,9 @@
+{
+  "name": "wow-platform",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "dev:api": "node apps/api/src/server.js",
+    "dev:web": "node scripts/serve-web.js"
+  }
+}
