@@ -1,4 +1,6 @@
 const { createRouter } = require("./http/router");
+const db = require("./db/database");
+require("./db/schema");
 const { sendError } = require("./http/send");
 const { createStore } = require("./store/memory-store");
 const { seedDemoData } = require("./seed/demo-data");
@@ -25,7 +27,7 @@ function createApp() {
   const conversation = createConversationService(store, orders);
   const services = { store, orders, ledger, deliveries, fallback, conversation };
   const router = createRouter();
-  registerCatalogRoutes(router, store);
+  registerCatalogRoutes(router, store, db);
   registerAuthRoutes(router, store);
   registerOrderRoutes(router, services);
   registerLedgerRoutes(router, services);
@@ -45,5 +47,6 @@ async function handleRequest(app, req, res) {
     sendError(res, 500, "VALIDATION", err.message);
   }
 }
+
 
 module.exports = { createApp, handleRequest };
