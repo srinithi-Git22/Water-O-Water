@@ -1,3 +1,4 @@
+
 const db = require("./database");
 
 db.exec(`
@@ -35,6 +36,16 @@ db.exec(`
     service_type TEXT
   );
 
+  CREATE TABLE IF NOT EXISTS delivery_partners (
+    id TEXT PRIMARY KEY,
+    supplier_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    vehicle_number TEXT NOT NULL,
+    status TEXT DEFAULT 'available',
+    created_at TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY,
     code TEXT NOT NULL,
@@ -53,10 +64,13 @@ db.exec(`
     customer_consented_fallback INTEGER DEFAULT 0,
     version INTEGER DEFAULT 1,
     rider_name TEXT,
+    rider_phone TEXT,
+    vehicle_number TEXT,
     eta TEXT,
     created_at TEXT NOT NULL
   );
-    CREATE TABLE IF NOT EXISTS order_items (
+
+  CREATE TABLE IF NOT EXISTS order_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     order_id TEXT NOT NULL,
     product_id TEXT NOT NULL,
@@ -64,7 +78,6 @@ db.exec(`
     unit_price_paise INTEGER NOT NULL,
     total_paise INTEGER NOT NULL
   );
-
 
   CREATE TABLE IF NOT EXISTS order_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -83,4 +96,35 @@ db.exec(`
   );
 `);
 
+// Add new columns to an existing orders table
+// without deleting or recreating existing orders.
+function addColumnIfMissing(table, column, definition) {
+  const columns = db
+    .prepare(`PRAGMA table_info(${table})`)
+    .all();
+
+  const exists = columns.some(
+    (item) => item.name === column
+  );
+
+  if (!exists) {
+    db.exec(
+      `ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`
+    );
+  }
+}
+
+addColumnIfMissing(
+  "orders",
+  "rider_phone",
+  "TEXT"
+);
+
+addColumnIfMissing(
+  "orders",
+  "vehicle_number",
+  "TEXT"
+);
+
 console.log("Database schema ready.");
+

@@ -35,6 +35,59 @@ function createDatabaseStore() {
           `)
           .all();
       },
+
+      findByPhone(phone) {
+        return db
+          .prepare(`
+            SELECT
+              id,
+              household_id AS householdId,
+              name,
+              phone,
+              locale
+            FROM customers
+            WHERE phone = ?
+            LIMIT 1
+          `)
+          .get(phone);
+      },
+
+      findById(id) {
+        return db
+          .prepare(`
+            SELECT
+              id,
+              household_id AS householdId,
+              name,
+              phone,
+              locale
+            FROM customers
+            WHERE id = ?
+            LIMIT 1
+          `)
+          .get(id);
+      },
+
+      create(customer) {
+        db.prepare(`
+          INSERT INTO customers (
+            id,
+            household_id,
+            name,
+            phone,
+            locale
+          )
+          VALUES (?, ?, ?, ?, ?)
+        `).run(
+          customer.id,
+          customer.householdId,
+          customer.name,
+          customer.phone,
+          customer.locale || "en"
+        );
+
+        return this.findById(customer.id);
+      },
     },
 
     addresses: {
@@ -50,6 +103,35 @@ function createDatabaseStore() {
             ORDER BY id
           `)
           .all();
+      },
+
+      create(address) {
+        db.prepare(`
+          INSERT INTO addresses (
+            id,
+            household_id,
+            line,
+            delivery_pref
+          )
+          VALUES (?, ?, ?, ?)
+        `).run(
+          address.id,
+          address.householdId,
+          address.line,
+          address.deliveryPref || "standard"
+        );
+
+        return db
+          .prepare(`
+            SELECT
+              id,
+              household_id AS householdId,
+              line,
+              delivery_pref AS deliveryPref
+            FROM addresses
+            WHERE id = ?
+          `)
+          .get(address.id);
       },
     },
 

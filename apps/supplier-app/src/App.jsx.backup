@@ -85,8 +85,6 @@ function App() {
   const [error, setError] = useState("");
 
   const [processingOrderId, setProcessingOrderId] = useState(null);
-  const [deliveryPartners, setDeliveryPartners] = useState([]);
-const [selectedPartnerByOrder, setSelectedPartnerByOrder] = useState({});
   const [showAllOrders, setShowAllOrders] = useState(false);
 
   const [showProductModal, setShowProductModal] = useState(false);
@@ -164,28 +162,11 @@ async function loadServiceAreas() {
   }
 }
 
- useEffect(() => {
-  loadOrders();
-  loadProducts();
-  loadServiceAreas();
-
-  async function loadDeliveryPartners() {
-    try {
-      const data = await getDeliveryPartners("sup-murugan");
-      setDeliveryPartners(
-        Array.isArray(data) ? data : []
-      );
-    } catch (err) {
-      console.error(
-        "Failed to load delivery partners:",
-        err
-      );
-      setDeliveryPartners([]);
-    }
-  }
-
-  loadDeliveryPartners();
-}, []);
+  useEffect(() => {
+    loadOrders();
+    loadProducts();
+     loadServiceAreas();
+  }, []);
 
   async function handleAccept(order) {
     try {
@@ -219,35 +200,6 @@ async function loadServiceAreas() {
 
     await loadOrders();
   } catch (err) {
-    alert(err.message);
-  } finally {
-    setProcessingOrderId(null);
-  }
-}
-async function handleAssignDeliveryPartner(order) {
-  const partnerId = selectedPartnerByOrder[order.id];
-
-  if (!partnerId) {
-    alert("Please select a rider first.");
-    return;
-  }
-
-  try {
-    setProcessingOrderId(order.id);
-
-    await assignDeliveryPartner(
-      order.id,
-      partnerId
-    );
-
-    await loadOrders();
-
-    alert("Rider assigned successfully.");
-  } catch (err) {
-    console.error(
-      "Failed to assign delivery partner:",
-      err
-    );
     alert(err.message);
   } finally {
     setProcessingOrderId(null);
@@ -556,67 +508,10 @@ async function handleDeleteProduct(product) {
                       )}
                     </span>
 
-                  <span>
-  {order.riderName ? (
-    <div>
-      <strong>{order.riderName}</strong>
-      {order.vehicleNumber && (
-        <div>{order.vehicleNumber}</div>
-      )}
-    </div>
-  ) : (
-    <div>
-      <select
-        value={
-          selectedPartnerByOrder[order.id] || ""
-        }
-        onChange={(event) =>
-          setSelectedPartnerByOrder((current) => ({
-            ...current,
-            [order.id]: event.target.value,
-          }))
-        }
-        disabled={
-          processingOrderId === order.id ||
-          order.status !== "accepted"
-        }
-      >
-        <option value="">
-          Select rider
-        </option>
-
-        {deliveryPartners.map((partner) => (
-          <option
-            key={partner.id}
-            value={partner.id}
-          >
-            {partner.name}
-            {partner.vehicleNumber
-              ? ` - ${partner.vehicleNumber}`
-              : ""}
-          </option>
-        ))}
-      </select>
-
-      {order.status === "accepted" && (
-        <button
-          className="start-button"
-          disabled={
-            processingOrderId === order.id ||
-            !selectedPartnerByOrder[order.id]
-          }
-          onClick={() =>
-            handleAssignDeliveryPartner(order)
-          }
-        >
-          {processingOrderId === order.id
-            ? "Assigning..."
-            : "Assign Rider"}
-        </button>
-      )}
-    </div>
-  )}
-</span>
+                    <span>
+                      {order.riderName ||
+                        "Not assigned"}
+                    </span>
 
                     <span className="eta-cell">
                       {order.eta ||

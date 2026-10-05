@@ -1,76 +1,151 @@
 
-import React, { useEffect, useState } from "react";
+import React, {
+  useEffect,
+  useState,
+} from "react";
 
 import {
-  SafeAreaView,
-  View,
   Text,
   StyleSheet,
   ActivityIndicator,
   Alert,
 } from "react-native";
 
-import HomeScreen from "./src/screens/HomeScreen";
-import OrderScreen from "./src/screens/OrderScreen";
-import OrdersScreen from "./src/screens/OrdersScreen";
-import TrackScreen from "./src/screens/TrackScreen";
-import ProfileScreen from "./src/screens/ProfileScreen";
-import OrderConfirmedScreen from "./src/screens/OrderConfirmedScreen";
+import {
+  SafeAreaProvider,
+  SafeAreaView,
+} from "react-native-safe-area-context";
 
-import BottomTabBar from "./src/components/BottomTabBar";
+import AuthNavigator from "./src/navigation/AuthNavigator";
+import MainNavigator from "./src/navigation/MainNavigator";
 
 import {
   getBootstrap,
   getProducts,
-} from "./src/api";
+} from "./src/api/index";
+
+import {
+  getCustomerProfile,
+} from "./src/api/customerApi";
+
+import {
+  getAuthUser,
+  saveAuthUser,
+  clearAuthUser,
+} from "./src/storage/authStorage";
 
 import { COLORS } from "./src/styles/theme";
 
-export default function App() {
-  const [screen, setScreen] = useState("home");
+import SplashScreen from "./src/screens/auth/SplashScreen";
 
-  const [quantities, setQuantities] = useState({
-    can20: 2,
-    pack1: 0,
-    pack500: 0,
-  });
+function AppContent() {
+  const [loading, setLoading] =
+    useState(true);
 
-  const [data, setData] = useState(null);
-  const [products, setProducts] = useState([]);
+  const [showSplash, setShowSplash] =
+    useState(true);
 
-  const [confirmedOrder, setConfirmedOrder] =
+  const [authUser, setAuthUser] =
     useState(null);
 
-  const [loading, setLoading] = useState(true);
+  const [data, setData] =
+    useState(null);
+
+  const [products, setProducts] =
+    useState([]);
 
   useEffect(() => {
-    loadAppData();
+    initializeApp();
   }, []);
 
-  async function loadAppData() {
-  try {
-    const result = await getBootstrap(
-      "cust-ayesha"
-    );
+  async function initializeApp() {
+    try {
+      const savedUser =
+        await getAuthUser();
 
-    const productList = await getProducts();
+      if (savedUser) {
+        setAuthUser(savedUser);
 
-    setData(result);
+        if (savedUser.customerId) {
+          await loadAppData(
+            savedUser.customerId
+          );
+        }
+      }
+    } catch (error) {
+      console.log(
+        "App initialization error:",
+        error
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
 
-    setProducts(
-      Array.isArray(productList)
-        ? productList.map((product) => ({
-            id: product.id,
-            name: product.nameEn,
-            description:
-              product.nameTa || "",
-            price:
-              Number(
-                product.unitPricePaise || 0
-              ) / 100,
-          }))
-        : []
-    );
+  async function loadAppData(
+    customerId
+  ) {
+    try {
+      const result =
+        await getBootstrap(
+          customerId
+        );
+
+      const customerProfile =
+        await getCustomerProfile(
+          customerId
+        );
+
+      const productList =
+        await getProducts();
+
+      setData({
+        ...result,
+        customer:
+          customerProfile.customer,
+        address:
+          customerProfile.address,
+      });
+
+      setProducts(
+        Array.isArray(productList)
+          ? productList.map(
+              (product) => ({
+                id: product.id,
+
+                supplierId:
+                  product.supplierId,
+
+                sku:
+                  product.sku,
+
+                nameEn:
+                  product.nameEn,
+
+                nameTa:
+                  product.nameTa,
+
+                name:
+                  product.nameEn,
+
+                description:
+                  product.nameTa || "",
+
+                unitPricePaise:
+                  product.unitPricePaise,
+
+                price:
+                  Number(
+                    product.unitPricePaise ||
+                      0
+                  ) / 100,
+
+                serviceType:
+                  product.serviceType,
+              })
+            )
+          : []
+      );
     } catch (error) {
       console.log(
         "Backend error:",
@@ -81,202 +156,181 @@ export default function App() {
         "Connection Error",
         "Could not connect to the WoW backend."
       );
-    } finally {
-      setLoading(false);
     }
   }
 
-  function changeQuantity(
-    productId,
-    amount
+  async function handleProfileUpdated() {
+    if (!authUser?.customerId) {
+      return;
+    }
+
+    try {
+      const customerProfile =
+        await getCustomerProfile(
+          authUser.customerId
+        );
+
+      setData((current) => ({
+        ...(current || {}),
+
+        customer:
+          customerProfile.customer,
+
+        address:
+          customerProfile.address,
+      }));
+    } catch (error) {
+      console.log(
+        "Profile refresh error:",
+        error
+      );
+
+      Alert.alert(
+        "Refresh Failed",
+        "Your changes were saved, but the latest profile data could not be refreshed."
+      );
+    }
+  }
+
+  async function handleAuthComplete(
+    user
   ) {
-    setQuantities((current) => ({
-      ...current,
-      [productId]: Math.max(
-        0,
-        (current[productId] || 0) + amount
-      ),
-    }));
+    try {
+      const savedUser = {
+        ...user,
+
+        customerId:
+          user.customerId || null,
+      };
+
+      await saveAuthUser(
+        savedUser
+      );
+
+      setAuthUser(savedUser);
+
+      if (savedUser.customerId) {
+        await loadAppData(
+          savedUser.customerId
+        );
+      }
+    } catch (error) {
+      console.log(
+        "Failed to save user:",
+        error
+      );
+    }
   }
 
-  function handleOrderConfirmed(order) {
-    console.log(
-      "APP: Setting confirmed order:",
-      order
-    );
+  async function handleLogout() {
+    try {
+      await clearAuthUser();
 
-    setConfirmedOrder(order);
-
-    console.log(
-      "APP: Navigating to confirmed screen"
-    );
-
-    setScreen("confirmed");
+      setAuthUser(null);
+      setData(null);
+      setProducts([]);
+    } catch (error) {
+      console.log(
+        "Logout error:",
+        error
+      );
+    }
   }
 
-  function renderScreen() {
-    console.log(
-      "CURRENT SCREEN:",
-      screen
+  if (showSplash) {
+    return (
+      <SplashScreen
+        onFinish={() =>
+          setShowSplash(false)
+        }
+      />
     );
-
-    console.log(
-      "CONFIRMED ORDER:",
-      confirmedOrder
-    );
-
-    if (screen === "home") {
-      return (
-        <HomeScreen
-          quantities={quantities}
-          changeQuantity={changeQuantity}
-          setScreen={setScreen}
-          data={data}
-            products={products}
-        />
-      );
-    }
-
-    if (screen === "order") {
-      return (
-        <OrderScreen
-          quantities={quantities}
-          changeQuantity={changeQuantity}
-          setScreen={setScreen}
-          data={data}
-          setConfirmedOrder={
-            handleOrderConfirmed
-          }
-          products={products}
-        />
-      );
-    }
-
-    if (screen === "confirmed") {
-      return (
-        <OrderConfirmedScreen
-          order={confirmedOrder}
-          setScreen={setScreen}
-        />
-      );
-    }
-
-    if (screen === "orders") {
-      return (
-        <OrdersScreen
-          setScreen={setScreen}
-          data={data}
-        />
-      );
-    }
-
-    if (screen === "track") {
-      return (
-        <TrackScreen
-          setScreen={setScreen}
-          data={data}
-          confirmedOrder={confirmedOrder}
-        />
-      );
-    }
-
-    if (screen === "profile") {
-      return (
-        <ProfileScreen
-          data={data}
-           setScreen={setScreen}
-        />
-      );
-    }
-
-    return null;
   }
 
   if (loading) {
     return (
       <SafeAreaView
-        style={styles.loadingContainer}
+        style={
+          styles.loadingContainer
+        }
       >
         <ActivityIndicator
           size="large"
-          color={COLORS.secondary}
+          color={
+            COLORS.secondary
+          }
         />
 
-        <Text style={styles.loadingText}>
+        <Text
+          style={
+            styles.loadingText
+          }
+        >
           Loading WoW...
         </Text>
       </SafeAreaView>
     );
   }
 
+  if (!authUser) {
+    return (
+      <AuthNavigator
+        onComplete={
+          handleAuthComplete
+        }
+      />
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.appHeader}>
-        <Text style={styles.title}>
-          WoW
-        </Text>
-
-        <Text style={styles.subtitle}>
-          Water O Water
-        </Text>
-      </View>
-
-      <View style={styles.screen}>
-        {renderScreen()}
-      </View>
-
-      {screen !== "confirmed" && (
-        <BottomTabBar
-          screen={screen}
-          setScreen={setScreen}
-        />
-      )}
+    <SafeAreaView
+      style={styles.container}
+    >
+      <MainNavigator
+        data={data}
+        products={products}
+        onLogout={handleLogout}
+        onProfileUpdated={
+          handleProfileUpdated
+        }
+      />
     </SafeAreaView>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppContent />
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+
     backgroundColor:
       COLORS.background,
   },
 
   loadingContainer: {
     flex: 1,
+
     backgroundColor:
       COLORS.background,
+
     alignItems: "center",
+
     justifyContent: "center",
   },
 
   loadingText: {
     color: COLORS.primary,
+
     marginTop: 12,
+
     fontWeight: "600",
-  },
-
-  appHeader: {
-    backgroundColor:
-      COLORS.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-  },
-
-  title: {
-    color: COLORS.white,
-    fontSize: 22,
-    fontWeight: "700",
-  },
-
-  subtitle: {
-    color: "#CDE6ED",
-    fontSize: 12,
-    marginTop: 2,
-  },
-
-  screen: {
-    flex: 1,
   },
 });
 
